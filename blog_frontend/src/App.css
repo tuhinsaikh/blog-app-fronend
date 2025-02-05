@@ -158,6 +158,12 @@ body {
   }
 }
 
+@media (min-width: 1200px) {
+  .css-1bm2fm6-MuiContainer-root {
+    max-width: 2400px !important; 
+  }
+}
+
 .nav-logo{
   border-radius: 1rem;
   height: 30px;
@@ -189,4 +195,19 @@ body {
 }
 .add-modal-header-icon{
   margin: 5px 15px 0px 0px;
+}
+.container-img{
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.font-display-image{
+  color: blue;
+  margin-bottom: -15px;
+}
+.submit-button{
+  display: flex;
+    width: 100%;
+    margin: 7px 5px;
+    justify-content: end;
 }

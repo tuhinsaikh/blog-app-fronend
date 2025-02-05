@@ -7,8 +7,12 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import NavigationIcon from '@mui/icons-material/Navigation';
 import AddBlogModal from '../modal/AddBlogModal';
 
-export default function AddActionButtons() {
+export default function AddActionButtons({onBlogAdded}) {
   const [open, setOpen] = React.useState(false);
+
+  const handleBlogAddedTo = () => {
+    onBlogAdded();
+  };
   const handleOpen = () => {
     setOpen(true);
   }
@@ -22,8 +26,7 @@ export default function AddActionButtons() {
       right: 16,         
       zIndex: 1000,      
     }}>
-      {console.log("open",open)};
-      {open && <AddBlogModal open = {open} handleCloseModal = {handleClose} />}
+      {open && <AddBlogModal open = {open} handleCloseModal = {handleClose} onBlogAdded={handleBlogAddedTo}/>}
       <Fab onClick={handleOpen} size="large" color="primary" aria-label="add">
         <AddIcon />
       </Fab>

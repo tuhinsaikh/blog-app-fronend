@@ -16,6 +16,8 @@ import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { useEffect, useState } from 'react';
 import {useDropzone} from 'react-dropzone';
+import { addBlobImage, createBlogPost, deleteBlobImage } from '../../apis/blog/blogApi';
+import { useAuth } from '../../src/context/AuthContext';
 
 /*
 {
@@ -77,11 +79,11 @@ const style = {
   transform: 'translate(-50%, -50%)',
   width: '80%',
   bgcolor: 'background.paper',
-  border: '2px solid #000',
+  // border: '2px solid #000',
   boxShadow: 24,
   p: 4,
-  borderRadius:'22px 22px 22px 22px',
-  padding:0,
+  // borderRadius:'22px 22px 22px 22px',
+  padding:"10px 5px 20px 5px",
 };
 
 
@@ -98,13 +100,14 @@ const style = {
   }));
 
 
-export default function AddBlogModal( {open, handleCloseModal}) {  
+export default function AddBlogModal( {open, handleCloseModal, onBlogAdded}) {  
   const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [hover, setHover] = useState(false);
   const [blogTitle, setBlogTitle] = useState("");
   const [blogBody, setBlogBody] = useState("");
-  console.log("blogTitle",blogTitle);
-  console.log('Content:', blogBody);
+  const [fileUrl, setFileUrl] = useState("");
+  const { currentUser } = useAuth();
   const handleClose = () => handleCloseModal();
   const handleTitleChange = (text) => setBlogTitle(text);
   const Iconstyle = {
@@ -112,22 +115,53 @@ export default function AddBlogModal( {open, handleCloseModal}) {
     height:'30px',
     color: 'darkblue',
     cursor: 'pointer',
-    color: hover ? 'red' : 'darkblue',
-    transition: 'color 0.3s',
+    "color": hover ? 'red' : 'darkblue',
   };
 
-  const {getRootProps, getInputProps} = useDropzone({
-    accept: 'image/*',
-    onDrop: acceptedFiles => {
-      setFiles(acceptedFiles.map(file => Object.assign(file, {
-        preview: URL.createObjectURL(file)
-      })));
+  const onDrop = React.useCallback(acceptedFiles => {
+    setFiles(
+        acceptedFiles.map(file => ({
+            name: file.name,
+            preview: URL.createObjectURL(file)
+        }))
+    );
+    uploadToBackend(acceptedFiles[0]);
+  }, []);
+
+  const { getRootProps, getInputProps } = useDropzone({ onDrop });
+
+  const uploadToBackend = async (file) => {
+    try {
+      setUploading(true);
+      const response = await addBlobImage(file);
+      
+      if(response.ok){
+        const uploadedFileUrl = await response.text();
+        setFileUrl(uploadedFileUrl)
+        console.error("uploadedFileUrl:", uploadedFileUrl);
+      }
+    } catch (error) {
+      console.error("Error fetching DB types:", error);
+    }finally{
+      setUploading(false);
     }
-  });
+  };
+  const removeImage = async() => {
+    try {
+      const response = await deleteBlobImage(fileUrl);
+      if(response.ok){
+        setFileUrl("");
+        setFiles([]);
+      }
+    } catch (error) {
+      console.error("Error fetching DB types:", error);
+    }
+    
+  };
 
   const thumbs = files.map((file) => {
     
-    if (!file.preview) return null; // Skip rendering if preview is invalid
+    if (!file.preview) return null; 
     console.log("file",file);
     return (
       <div
@@ -190,7 +224,7 @@ export default function AddBlogModal( {open, handleCloseModal}) {
             setBlogBody(quill.root.innerHTML);
           });
         }
-      }, 100); // Delay of 100ms to ensure DOM is loaded
+      }, 100); 
     }
     return () => {
       if (quill) {
@@ -199,6 +233,28 @@ export default function AddBlogModal( {open, handleCloseModal}) {
       clearTimeout(timeout);
     };
   }, [open]);
+
+  const handleSubmit = async () => {
+    if (!blogTitle || !blogBody) {
+        alert("Please fill in all fields");
+        return;
+    }
+    if(fileUrl==""){
+      alert("Please upload image");
+      return;
+    }
+    const blogData = { title: blogTitle, body: blogBody, name: "Tuhin", imgUrl: fileUrl, postTime: new Date().toISOString() };
+    const result = await createBlogPost(blogData);
+    console.log("result:",result);
+    if (result!="") {
+        alert("Blog created successfully");
+        handleClose();
+        onBlogAdded();
+    } else {
+        alert("Error creating blog");
+    }
+    setUploading(false);
+};
   
     
   return (
@@ -241,19 +297,52 @@ export default function AddBlogModal( {open, handleCloseModal}) {
                   <div id="editor" style={{ height: '200px' }} />
                 </Item>
                 </Grid>
-                <Grid size={6}>
+                <Grid size={12}>
                 <Item>
-                <section className="container">
-                    <div {...getRootProps({className: 'dropzone'})}>
-                        <input {...getInputProps()} />
+                <section className="container container-img">
+                    {!uploading && !files.length>=1 && <div style={{
+                                                              cursor: "pointer",
+                                                              fontSize: "small"}}  
+                        {...getRootProps({ className: "dropzone" })}>
+                        <input className='drag-and-drop' {...getInputProps()} />
+                        <h2 className='font-display-image'>Blog display picture</h2>
                         <p>Drag 'n' drop some files here, or click to select files</p>
-                    </div>
-                    <aside style={thumbs}>
-                        {thumbs}
-                    </aside>
+                    </div>}
+                    {uploading && <h3>Uploading...</h3>}
+                    {!uploading && <aside style={{ display: "flex", flexDirection: "column", marginTop: 10 }}>
+                        {files.map(file => (
+                            <div key={file.name} style={{ position: "relative", display: "inline-block" }}>
+                                <img src={file.preview} alt={file.name} width={100} />
+                                <button 
+                                    onClick={removeImage} 
+                                    style={{
+                                        position: "absolute",
+                                        top: -5,
+                                        right: -5,
+                                        background: "white",
+                                        color: "white",
+                                        border: "1px solid red",
+                                        borderRadius: "50%",
+                                        cursor: "pointer",
+                                        width: 20,
+                                        height: 20,
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center"
+                                    }}
+                                >
+                                    ❌
+                                </button>
+                                <p>{file.name}</p>
+                            </div>
+                        ))}
+                    </aside>}
+                   
                 </section>
                 </Item>
                 </Grid>
+                <div className='submit-button' onClick={handleSubmit}><button>Submit</button></div>
+                
             </Grid>
             </Box>}
           </Box>
